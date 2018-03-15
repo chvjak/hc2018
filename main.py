@@ -27,7 +27,7 @@ from datetime import datetime
 
 def main():
     #files = ['a_example', 'b_should_be_easy', 'c_no_hurry', 'd_metropolis', 'e_high_bonus' ]
-    files = ['c_no_hurry2.5k']
+    files = ['e_high_bonus']
 
     for fn in files:
         print('{} Processing {}'.format(datetime.now(), fn))
@@ -61,16 +61,16 @@ def main():
             print('DONE rides check.')
 
         def dp_chains(taken_rides):
-            max_profit_by_cell = defaultdict(tuple)
-            next_ride_by_cell = defaultdict(tuple)
+            max_profit_by_ride = defaultdict(int)
+            next_ride_by_ride = defaultdict(int)
             ride_finish_ranges = defaultdict(int)
 
             tmp_taken = set()
 
             for r in rides:
                 i, (r0, c0, rN, cN, s, f) = r
-                max_profit_by_cell[(rN, cN)] = 0
-                next_ride_by_cell[(rN, cN)] = None
+                max_profit_by_ride[i] = 0
+                next_ride_by_ride[i] = None
 
                 ride_time = dist(r0, c0, rN, cN)
                 ride_finish_ranges[i] = (s + ride_time, f)
@@ -109,26 +109,19 @@ def main():
                     if possible_finish_range[0] > possible_finish_range[1]:
                         continue
 
-                    potential_profit = ride_time            #TODO: Consider potential_profit = ride_time - time_to_ride
+                    potential_profit = ride_time
 
                     if cur_time_range[0] + time_to_ride <= ns:
                         potential_profit += ride_bonus
                         possible_finish_range = (possible_finish_range[0], ns)
 
-                    if max_profit_by_cell[(nrN, ncN)] + potential_profit > max_profit:
-                        max_profit = max_profit_by_cell[(nrN, ncN)] + potential_profit
+                    if max_profit_by_ride[ni] + potential_profit > max_profit:
+                        max_profit = max_profit_by_ride[ni] + potential_profit
                         max_profit_ride = ni
                         max_cur_time_range = (cur_time_range[0], possible_finish_range[1] - time_to_ride - ride_time)
 
-                '''
-                ride A also finishes in point X. A is last ride in the chain
-                ride B finishes in point X. It starts a chain. Info for X is overwritten.
-                ride A is picked as most profitable & fitting ride after ride C.
-                => after ride C chain B.. is  actually used and all rides are missed                                
-                '''
-
-                max_profit_by_cell[(rrN, rcN)] = max_profit
-                next_ride_by_cell[(rrN, rcN)] = max_profit_ride
+                max_profit_by_ride[i] = max_profit
+                next_ride_by_ride[i] = max_profit_ride
 
 
 
@@ -137,9 +130,9 @@ def main():
                     ride_finish_ranges[i] = max_cur_time_range
 
 
-            return max_profit_by_cell, next_ride_by_cell, ride_finish_ranges
+            return max_profit_by_ride, next_ride_by_ride, ride_finish_ranges
 
-        def get_ride_chain(max_profit_ride, next_ride_by_cell):
+        def get_ride_chain(max_profit_ride, next_ride_by_ride):
             i = max_profit_ride
             if i is None:
                 return []
@@ -148,13 +141,12 @@ def main():
 
             while True:
                 i, (r0, c0, rN, cN, s, f) = rides[i]
-
                 res.append(i)
 
-                if next_ride_by_cell[(rN, cN)] is None:
+                if next_ride_by_ride[i] is None:
                     break
 
-                i = next_ride_by_cell[(rN, cN)]
+                i = next_ride_by_ride[i]
 
 
 
@@ -199,7 +191,7 @@ def main():
                 if c % 10 == 0:
                     print('car {} of {}'.format(c, vehicles_num))
 
-                max_profit_by_cell, next_ride_by_cell, ride_finish_ranges = dp_chains(taken_rides)
+                max_profit_by_ride, next_ride_by_ride, ride_finish_ranges = dp_chains(taken_rides)
                 print('#')
 
                 max_profit = 0
@@ -213,10 +205,6 @@ def main():
                     time_to_ride = dist(0, 0, r0, c0)
                     ride_time = dist(r0, c0, rN, cN)
 
-                    # TODO: consider:
-                    # time to start ride is too big to finish the chain in time
-                    # PROBABLY it's not a problem? We would partially miss the chain
-                    # NO PROBLEM: algorithm skips start of the chain until it finds most profitable chain residual
                     if time_to_ride > ride_finish_ranges[i][1] - ride_time:
                         continue
 
@@ -224,15 +212,15 @@ def main():
                     if time_to_ride <= s:
                         potential_profit += ride_bonus
 
-                    if max_profit_by_cell[(rN, cN)] + potential_profit > max_profit and time_to_ride + ride_time < f:
-                        max_profit = max_profit_by_cell[(rN, cN)] + potential_profit
+                    if max_profit_by_ride[i] + potential_profit > max_profit and time_to_ride + ride_time < f:
+                        max_profit = max_profit_by_ride[i] + potential_profit
                         max_profit_ride = i
 
 
                 if max_profit_ride is None:
                     break
 
-                schedule[c] = get_ride_chain(max_profit_ride, next_ride_by_cell)   # update taken rides
+                schedule[c] = get_ride_chain(max_profit_ride, next_ride_by_ride)   # update taken rides
 
                 if not validate(schedule[c]):
                     for ri in schedule[c]:
