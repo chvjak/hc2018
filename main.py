@@ -5,27 +5,20 @@ import sys
 
 import heapq
 
-class PQ:
-    def __init__(self):
-        self.data = []
-
-    def enq(self, key, val):
-        heapq.heappush(self.data, (-key, val))
-
-    def deq(self):
-        key, val = heapq.heappop(self.data)
-
-        return val
-
-    def __len__(self):
-        return len(self.data)
-
-
-
 def dist(r0, c0, rN, cN):
     return abs(r0 - rN) + abs(c0 - cN)
 
 
+def intersect_ranges(range1, range2):
+    a, b = range1
+    c, d = range2
+
+    return (max(a, c), min(b, d))
+
+
+def shift_range(range1, ofs):
+    a, b = range1
+    return (a + ofs, b + ofs)
 
 
 from collections import defaultdict
@@ -33,8 +26,8 @@ import bisect
 from datetime import datetime
 
 def main():
-    files = ['a_example', 'b_should_be_easy', 'c_no_hurry', 'd_metropolis', 'e_high_bonus' ]
-
+    #files = ['a_example', 'b_should_be_easy', 'c_no_hurry', 'd_metropolis', 'e_high_bonus' ]
+    files = ['c_no_hurry2.5k']
 
     for fn in files:
         print('{} Processing {}'.format(datetime.now(), fn))
@@ -48,18 +41,26 @@ def main():
         rides_ss = rides[:]
         rides_ss.sort(key=lambda x: x[1][5])  # sort by end time
 
+        def check_rides():
+            starts = set()
+            ends  = set()
+            for r in rides:
+                i, (r0, c0, rN, cN, s, f) = r
+
+                if (r0, c0) in starts:
+                    print('dup start')
+                else:
+                    starts.add((r0, c0))
+
+                if (rN, cN) in ends:
+                    print('dup end')
+                else:
+                    ends.add((rN, cN))
+
+
+            print('DONE rides check.')
+
         def dp_chains(taken_rides):
-            def intersect_ranges(range1, range2):
-                a, b = range1
-                c, d = range2
-
-                return (max(a,c), min(b,d))
-
-            def shift_range(range1, ofs):
-                a, b = range1
-                return (a + ofs, b + ofs)
-
-
             max_profit_by_cell = defaultdict(tuple)
             next_ride_by_cell = defaultdict(tuple)
             ride_finish_ranges = defaultdict(int)
@@ -111,15 +112,26 @@ def main():
                     potential_profit = ride_time            #TODO: Consider potential_profit = ride_time - time_to_ride
 
                     if cur_time_range[0] + time_to_ride <= ns:
-                        potential_profit += ride_bonus      #TODO: update cur_time_range is case is max is reached with bonus
+                        potential_profit += ride_bonus
+                        possible_finish_range = (possible_finish_range[0], ns)
 
                     if max_profit_by_cell[(nrN, ncN)] + potential_profit > max_profit:
                         max_profit = max_profit_by_cell[(nrN, ncN)] + potential_profit
                         max_profit_ride = ni
                         max_cur_time_range = (cur_time_range[0], possible_finish_range[1] - time_to_ride - ride_time)
 
+                '''
+                ride A also finishes in point X. A is last ride in the chain
+                ride B finishes in point X. It starts a chain. Info for X is overwritten.
+                ride A is picked as most profitable & fitting ride after ride C.
+                => after ride C chain B.. is  actually used and all rides are missed                                
+                '''
+
                 max_profit_by_cell[(rrN, rcN)] = max_profit
                 next_ride_by_cell[(rrN, rcN)] = max_profit_ride
+
+
+
                 tmp_taken.add(max_profit_ride)
                 if max_cur_time_range is not None:
                     ride_finish_ranges[i] = max_cur_time_range
@@ -151,6 +163,7 @@ def main():
         def validate(chain):
             cur_time = 0
             car_coords = (0, 0)
+            mc = 0
             for ride_ix in chain:
                 nr = rides[ride_ix]
                 i, (r0, c0, rN, cN, s, f) = nr
@@ -161,10 +174,17 @@ def main():
 
                 if cur_time + time_to_ride + ride_time > f:
                     print('missed ride ' + str(i))
+                    mc += 1
                     #return
 
                 car_coords = (rN, cN)
                 cur_time += time_to_ride + ride_time
+
+            if mc:
+                print('{}/{} rides missed'.format(mc, len(chain)))
+                return False
+
+            return True
 
 
 
@@ -193,8 +213,10 @@ def main():
                     time_to_ride = dist(0, 0, r0, c0)
                     ride_time = dist(r0, c0, rN, cN)
 
+                    # TODO: consider:
                     # time to start ride is too big to finish the chain in time
                     # PROBABLY it's not a problem? We would partially miss the chain
+                    # NO PROBLEM: algorithm skips start of the chain until it finds most profitable chain residual
                     if time_to_ride > ride_finish_ranges[i][1] - ride_time:
                         continue
 
@@ -212,107 +234,18 @@ def main():
 
                 schedule[c] = get_ride_chain(max_profit_ride, next_ride_by_cell)   # update taken rides
 
-                validate(schedule[c])
+                if not validate(schedule[c]):
+                    for ri in schedule[c]:
+                        print(ri, ride_finish_ranges[ri])
 
                 taken_rides.update(schedule[c])
 
 
-        def solution0():
-            # TODO: improve key
-
-            pq = PQ()
-            for r in rides:
-                i, (r0, c0, rN, cN, s, f) = r
-                ride_time = dist(r0, c0, rN, cN)
-
-                pq.enq(ride_time, r)
-
-            schedule = [[] for x in range(vehicles_num)]
-
-            def most_profitable_ride(c, t, car_pos):
-                tmp = []
-                found = False
-                while len(pq):
-                    r = pq.deq()
-
-                    i, (r0, c0, rN, cN, s, f) = r
-
-                    ride_time = dist(r0, c0, rN, cN)
-                    time_to_ride = dist(*car_pos[c], r0, c0)
-
-                    if t + time_to_ride + ride_time <= f:
-                        found = True
-                        break
-                    else:
-                        tmp.append((ride_time, r))
-
-                for t1, r1 in tmp:
-                    pq.enq(t1, r1)
-
-                if found:
-                    return r
-                else:
-                    return None
-
-            def closest_ride(c, t, car_pos, taken_rides):
-                pq = PQ()
-
-                # find first  index of the ride which ends later than current one is finished
-                si = bisect.bisect([x[1][5] for x in rides_ss], t)
-                for r in rides_ss[si:]:
-                    i, (r0, c0, rN, cN, s, f) = r
-
-                    if i in taken_rides:
-                        continue
-
-                    ride_time = dist(r0, c0, rN, cN)
-                    time_to_ride = dist(*car_pos[c], r0, c0)
-                    time_to_ride = time_to_ride if time_to_ride > 0 else 0.1
-
-                    if t + time_to_ride + ride_time <= f:
-                        value = 10 * ride_time / time_to_ride
-                        if t + time_to_ride <= s:
-                            value += ride_bonus / time_to_ride
-
-                        pq.enq(value, r)
-
-                if len(pq):
-                    return pq.deq()
-                else:
-                    return None
-
-
-            car_pos = [(0, 0)] * vehicles_num
-            taken_rides = set()
-            for c in range(vehicles_num):
-                t = 0
-                car_pos[c] = (0, 0)
-                print('#')
-                while t < steps_num and len(pq):
-                    print('.', end='')
-                    #r = most_profitable_ride(c, t, car_pos)
-                    r = closest_ride(c, t, car_pos, taken_rides)
-                    if r is None:
-                        break
-
-                    i, (r0, c0, rN, cN, s, f) = r
-
-                    schedule[c].append(i)
-                    taken_rides.add(i)
-
-                    ride_time = dist(r0, c0, rN, cN)
-                    time_to_ride = dist(*car_pos[c], r0, c0)
-
-                    t += max(time_to_ride, s - t) + ride_time
-                    car_pos[c] = (rN, cN)
-            return schedule
-
-
-        def solution1():
+        def solution():
             get_schedule()
 
-        #schedule = solution0()
-        solution1()
+        check_rides()
+        solution()
 
         of = open(fn + '.out', mode='w')
         for s in schedule:
