@@ -65,7 +65,7 @@ def main():
             max_profit_by_ride = defaultdict(int)
             next_ride_by_ride = defaultdict(int)
             ride_finish_ranges = defaultdict(int)
-            rides_taken_by_ride = defaultdict(set)  #TODO: TOO SLOW, ALSO ERRORS
+            rides_taken_by_ride = defaultdict(set)  #TODO: TOO SLOW, ALSO ERRORS, Consider HUGE bitfield
 
             for r in rides:
                 i, (r0, c0, rN, cN, s, f) = r
