@@ -27,7 +27,8 @@ from datetime import datetime
 
 def main():
     #files = ['a_example', 'b_should_be_easy', 'c_no_hurry', 'd_metropolis', 'e_high_bonus' ]
-    files = ['e_high_bonus']
+    #files = ['d_metropolis', 'e_high_bonus' ]
+    files = ['d_metropolis1k']
 
     for fn in files:
         print('{} Processing {}'.format(datetime.now(), fn))
@@ -43,7 +44,7 @@ def main():
 
         def check_rides():
             starts = set()
-            ends  = set()
+            ends = set()
             for r in rides:
                 i, (r0, c0, rN, cN, s, f) = r
 
@@ -64,8 +65,7 @@ def main():
             max_profit_by_ride = defaultdict(int)
             next_ride_by_ride = defaultdict(int)
             ride_finish_ranges = defaultdict(int)
-
-            tmp_taken = set()
+            rides_taken_by_ride = defaultdict(set)
 
             for r in rides:
                 i, (r0, c0, rN, cN, s, f) = r
@@ -74,10 +74,12 @@ def main():
 
                 ride_time = dist(r0, c0, rN, cN)
                 ride_finish_ranges[i] = (s + ride_time, f)
+                rides_taken_by_ride[i].add(i)
+
 
             for r in rides_fs:
                 i, (rr0, rc0, rrN, rcN, rs, rf) = r
-                if i in taken_rides or i in tmp_taken:
+                if i in taken_rides:
                     continue
 
                 # range
@@ -98,8 +100,8 @@ def main():
                     if i == ni or ni in taken_rides:
                         continue
 
-                    # TODO: ride could be a part of multiple chains BUT there should be no loops
-                    if ni in tmp_taken:
+                    # Check there are no loops
+                    if i in rides_taken_by_ride[ni]:
                         continue
 
                     time_to_ride = dist(rrN, rcN, nr0, nc0)
@@ -123,12 +125,11 @@ def main():
                 max_profit_by_ride[i] = max_profit
                 next_ride_by_ride[i] = max_profit_ride
 
+                if max_profit_ride is not None:
+                    rides_taken_by_ride[i].update(rides_taken_by_ride[max_profit_ride])
 
-
-                tmp_taken.add(max_profit_ride)
                 if max_cur_time_range is not None:
                     ride_finish_ranges[i] = max_cur_time_range
-
 
             return max_profit_by_ride, next_ride_by_ride, ride_finish_ranges
 
