@@ -1,9 +1,8 @@
-#import pandas as pd
-#import numpy as np
+from collections import defaultdict
+import bisect
+from datetime import datetime
 from lib import *
-import sys
 
-import heapq
 
 def dist(r0, c0, rN, cN):
     return abs(r0 - rN) + abs(c0 - cN)
@@ -13,21 +12,17 @@ def intersect_ranges(range1, range2):
     a, b = range1
     c, d = range2
 
-    return (max(a, c), min(b, d))
+    return max(a, c), min(b, d)
 
 
 def shift_range(range1, ofs):
     a, b = range1
-    return (a + ofs, b + ofs)
+    return a + ofs, b + ofs
 
-
-from collections import defaultdict
-import bisect
-from datetime import datetime
 
 def main():
-    #files = ['a_example', 'b_should_be_easy', 'c_no_hurry', 'd_metropolis', 'e_high_bonus' ]
-    files = ['e_high_bonus']
+    # files = ['a_example', 'b_should_be_easy', 'c_no_hurry', 'd_metropolis', 'e_high_bonus']
+    files = ['d_metropolis1k']
 
     for fn in files:
         print('{} Processing {}'.format(datetime.now(), fn))
@@ -40,25 +35,6 @@ def main():
 
         rides_ss = rides[:]
         rides_ss.sort(key=lambda x: x[1][5])  # sort by end time
-
-        def check_rides():
-            starts = set()
-            ends  = set()
-            for r in rides:
-                i, (r0, c0, rN, cN, s, f) = r
-
-                if (r0, c0) in starts:
-                    print('dup start')
-                else:
-                    starts.add((r0, c0))
-
-                if (rN, cN) in ends:
-                    print('dup end')
-                else:
-                    ends.add((rN, cN))
-
-
-            print('DONE rides check.')
 
         def dp_chains(taken_rides):
             max_profit_by_ride = defaultdict(int)
@@ -99,6 +75,7 @@ def main():
                         continue
 
                     # TODO: ride could be a part of multiple chains BUT there should be no loops
+                    # SEEMS it's a big deal, BUT very slow - changes from O(n^2) to O(n^3) due to merge of sets plus memory complexity O(n^2) added
                     if ni in tmp_taken:
                         continue
 
@@ -109,7 +86,7 @@ def main():
                     if possible_finish_range[0] > possible_finish_range[1]:
                         continue
 
-                    potential_profit = ride_time
+                    potential_profit = ride_time - time_to_ride
 
                     if cur_time_range[0] + time_to_ride <= ns:
                         potential_profit += ride_bonus
@@ -120,15 +97,14 @@ def main():
                         max_profit_ride = ni
                         max_cur_time_range = (cur_time_range[0], possible_finish_range[1] - time_to_ride - ride_time)
 
+                if max_profit_ride is None:
+                    continue
+
                 max_profit_by_ride[i] = max_profit
                 next_ride_by_ride[i] = max_profit_ride
-
-
+                ride_finish_ranges[i] = max_cur_time_range
 
                 tmp_taken.add(max_profit_ride)
-                if max_cur_time_range is not None:
-                    ride_finish_ranges[i] = max_cur_time_range
-
 
             return max_profit_by_ride, next_ride_by_ride, ride_finish_ranges
 
@@ -148,8 +124,6 @@ def main():
 
                 i = next_ride_by_ride[i]
 
-
-
             return res
 
         def validate(chain):
@@ -167,7 +141,6 @@ def main():
                 if cur_time + time_to_ride + ride_time > f:
                     print('missed ride ' + str(i))
                     mc += 1
-                    #return
 
                 car_coords = (rN, cN)
                 cur_time += time_to_ride + ride_time
@@ -177,9 +150,6 @@ def main():
                 return False
 
             return True
-
-
-
 
         def get_schedule():
             taken_rides = set()
@@ -216,7 +186,6 @@ def main():
                         max_profit = max_profit_by_ride[i] + potential_profit
                         max_profit_ride = i
 
-
                 if max_profit_ride is None:
                     break
 
@@ -228,12 +197,7 @@ def main():
 
                 taken_rides.update(schedule[c])
 
-
-        def solution():
-            get_schedule()
-
-        check_rides()
-        solution()
+        get_schedule()
 
         of = open(fn + '.out', mode='w')
         for s in schedule:
@@ -241,9 +205,6 @@ def main():
             of.write("{} {}\n".format(len(s),' '.join([str(x) for x in s])))
 
         of.close()
-
-
-
 
 
 if __name__ == '__main__':
