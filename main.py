@@ -1,9 +1,6 @@
-#import pandas as pd
-#import numpy as np
-from lib import *
-import sys
 
-import heapq
+from lib import *
+from bitfield import Bitfield
 
 def dist(r0, c0, rN, cN):
     return abs(r0 - rN) + abs(c0 - cN)
@@ -65,8 +62,10 @@ def main():
             max_profit_by_ride = defaultdict(int)
             next_ride_by_ride = defaultdict(int)
             ride_finish_ranges = defaultdict(int)
-            rides_taken_by_ride = defaultdict(set)  #TODO: TOO SLOW, ALSO ERRORS, Consider HUGE bitfield
 
+            rides_taken_by_ride = dict()
+
+            N = len(rides)
             for r in rides:
                 i, (r0, c0, rN, cN, s, f) = r
                 max_profit_by_ride[i] = 0
@@ -74,7 +73,9 @@ def main():
 
                 ride_time = dist(r0, c0, rN, cN)
                 ride_finish_ranges[i] = (s + ride_time, f)
-                rides_taken_by_ride[i].add(i)
+
+                rides_taken_by_ride[i] = Bitfield(N)
+                rides_taken_by_ride[i].set(i)
 
 
             for r in rides_fs:
@@ -101,7 +102,7 @@ def main():
                         continue
 
                     # Check there are no loops
-                    if i in rides_taken_by_ride[ni]:
+                    if rides_taken_by_ride[ni].get(i):
                         continue
 
                     time_to_ride = dist(rrN, rcN, nr0, nc0)
@@ -126,7 +127,7 @@ def main():
                 next_ride_by_ride[i] = max_profit_ride
 
                 if max_profit_ride is not None:
-                    rides_taken_by_ride[i].update(rides_taken_by_ride[max_profit_ride])
+                    rides_taken_by_ride[i].merge(rides_taken_by_ride[max_profit_ride])
 
                 if max_cur_time_range is not None:
                     ride_finish_ranges[i] = max_cur_time_range
