@@ -142,7 +142,7 @@ def main():
             res = []
 
             while True:
-                i, (r0, c0, rN, cN, s, f) = rides[i]
+                i, _ = rides[i]
                 res.append(i)
 
                 if next_ride_by_ride[i] is None:
