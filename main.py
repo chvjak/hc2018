@@ -1,6 +1,9 @@
-
+#import pandas as pd
+#import numpy as np
 from lib import *
-from bitfield import Bitfield
+import sys
+
+import heapq
 
 def dist(r0, c0, rN, cN):
     return abs(r0 - rN) + abs(c0 - cN)
@@ -24,8 +27,7 @@ from datetime import datetime
 
 def main():
     #files = ['a_example', 'b_should_be_easy', 'c_no_hurry', 'd_metropolis', 'e_high_bonus' ]
-    #files = ['d_metropolis', 'e_high_bonus' ]
-    files = ['d_metropolis1k']
+    files = ['e_high_bonus']
 
     for fn in files:
         print('{} Processing {}'.format(datetime.now(), fn))
@@ -62,10 +64,9 @@ def main():
             max_profit_by_ride = defaultdict(int)
             next_ride_by_ride = defaultdict(int)
             ride_finish_ranges = defaultdict(int)
+            rides_taken_by_ride = defaultdict(set)
 
-            rides_taken_by_ride = dict()
-
-            N = len(rides)
+            tmp_taken = set()
             for r in rides:
                 i, (r0, c0, rN, cN, s, f) = r
                 max_profit_by_ride[i] = 0
@@ -73,14 +74,16 @@ def main():
 
                 ride_time = dist(r0, c0, rN, cN)
                 ride_finish_ranges[i] = (s + ride_time, f)
-
-                rides_taken_by_ride[i] = Bitfield(N)
-                rides_taken_by_ride[i].set(i)
+                rides_taken_by_ride[i].add(i)
 
 
             for r in rides_fs:
                 i, (rr0, rc0, rrN, rcN, rs, rf) = r
                 if i in taken_rides:
+                    continue
+
+                # do not prolong the chain if a node already is a part of the chain
+                if i in tmp_taken:
                     continue
 
                 # range
@@ -102,8 +105,10 @@ def main():
                         continue
 
                     # Check there are no loops
-                    if rides_taken_by_ride[ni].get(i):
+                    if i in rides_taken_by_ride[ni]:
                         continue
+
+
 
                     time_to_ride = dist(rrN, rcN, nr0, nc0)
                     ride_time = dist(nr0, nc0, nrN, ncN)
@@ -127,7 +132,9 @@ def main():
                 next_ride_by_ride[i] = max_profit_ride
 
                 if max_profit_ride is not None:
-                    rides_taken_by_ride[i].merge(rides_taken_by_ride[max_profit_ride])
+                    rides_taken_by_ride[i].update(rides_taken_by_ride[max_profit_ride])
+
+                    tmp_taken.update(rides_taken_by_ride[i])
 
                 if max_cur_time_range is not None:
                     ride_finish_ranges[i] = max_cur_time_range
@@ -141,15 +148,21 @@ def main():
 
             res = []
 
+            taken_rides = set()
             while True:
                 i, _ = rides[i]
+
+                if i in taken_rides :
+                    print('loop in the chain:', i)
+                    break
+
                 res.append(i)
+                taken_rides.add(i)
 
                 if next_ride_by_ride[i] is None:
                     break
 
                 i = next_ride_by_ride[i]
-
 
 
             return res
@@ -195,6 +208,7 @@ def main():
 
                 max_profit_by_ride, next_ride_by_ride, ride_finish_ranges = dp_chains(taken_rides)
                 print('#')
+
 
                 max_profit = 0
                 max_profit_ride = None
