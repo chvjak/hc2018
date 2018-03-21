@@ -1,10 +1,5 @@
-#import pandas as pd
-#import numpy as np
 from lib import *
-import sys
-
-import heapq
-
+from bitfield import Bitfield
 def dist(r0, c0, rN, cN):
     return abs(r0 - rN) + abs(c0 - cN)
 
@@ -27,7 +22,7 @@ from datetime import datetime
 
 def main():
     #files = ['a_example', 'b_should_be_easy', 'c_no_hurry', 'd_metropolis', 'e_high_bonus' ]
-    files = ['e_high_bonus']
+    files = ['d_metropolis', 'e_high_bonus' ]
 
     for fn in files:
         print('{} Processing {}'.format(datetime.now(), fn))
@@ -41,24 +36,88 @@ def main():
         rides_ss = rides[:]
         rides_ss.sort(key=lambda x: x[1][5])  # sort by end time
 
-        def check_rides():
-            starts = set()
-            ends = set()
+        def dp_chains0(taken_rides):
+            max_profit_by_ride = defaultdict(int)
+            next_ride_by_ride = defaultdict(int)
+            ride_finish_ranges = defaultdict(int)
+            rides_taken_by_ride = dict()
+
+            tmp_taken = Bitfield(rides_num)
             for r in rides:
                 i, (r0, c0, rN, cN, s, f) = r
+                max_profit_by_ride[i] = 0
+                next_ride_by_ride[i] = None
 
-                if (r0, c0) in starts:
-                    print('dup start')
-                else:
-                    starts.add((r0, c0))
+                ride_time = dist(r0, c0, rN, cN)
+                ride_finish_ranges[i] = (s + ride_time, f)
 
-                if (rN, cN) in ends:
-                    print('dup end')
-                else:
-                    ends.add((rN, cN))
+                rides_taken_by_ride[i] = Bitfield(rides_num)
+                rides_taken_by_ride[i].set(i)
 
 
-            print('DONE rides check.')
+            for r in rides_fs:
+                i, (rr0, rc0, rrN, rcN, rs, rf) = r
+                if i in taken_rides:
+                    continue
+
+                # do not prolong the chain if a node already is a part of the chain
+                if tmp_taken.get(i):
+                    continue
+
+                # range
+                ride_finish_range = ride_finish_ranges[i]
+                cur_time_range = ride_finish_range
+
+                # find first  index of the ride which ends later than current one is finished
+                si = bisect.bisect([x[1][5] for x in rides_ss], cur_time_range[0])
+
+                # loop through  'next rides', pick the one with max profit
+                max_profit = 0
+                max_profit_ride = None
+                max_cur_time_range = None
+                for nr in rides_ss[si:]:
+                    ni, (nr0, nc0, nrN, ncN, ns, nf) = nr
+                    ride_finish_range = ride_finish_ranges[ni]
+
+                    if i == ni or ni in taken_rides:
+                        continue
+
+                    # Check there are no loops
+                    if rides_taken_by_ride[ni].get(i):
+                        continue
+
+
+
+                    time_to_ride = dist(rrN, rcN, nr0, nc0)
+                    ride_time = dist(nr0, nc0, nrN, ncN)
+
+                    possible_finish_range = intersect_ranges(ride_finish_range, shift_range(cur_time_range, time_to_ride + ride_time))
+                    if possible_finish_range[0] > possible_finish_range[1]:
+                        continue
+
+                    #potential_profit = ride_time - time_to_ride
+                    potential_profit = ride_time
+
+                    if cur_time_range[0] + time_to_ride <= ns:
+                        potential_profit += ride_bonus
+                        possible_finish_range = (possible_finish_range[0], ns)
+
+                    if max_profit_by_ride[ni] + potential_profit > max_profit:
+                        max_profit = max_profit_by_ride[ni] + potential_profit
+                        max_profit_ride = ni
+                        max_cur_time_range = (cur_time_range[0], possible_finish_range[1] - time_to_ride - ride_time)
+
+                max_profit_by_ride[i] = max_profit
+                next_ride_by_ride[i] = max_profit_ride
+
+                if max_profit_ride is not None:
+                    rides_taken_by_ride[i].merge(rides_taken_by_ride[max_profit_ride])
+                    tmp_taken.merge(rides_taken_by_ride[i])
+
+                if max_cur_time_range is not None:
+                    ride_finish_ranges[i] = max_cur_time_range
+
+            return max_profit_by_ride, next_ride_by_ride, ride_finish_ranges
 
         def dp_chains(taken_rides):
             max_profit_by_ride = defaultdict(int)
@@ -117,6 +176,7 @@ def main():
                     if possible_finish_range[0] > possible_finish_range[1]:
                         continue
 
+                    #potential_profit = ride_time - time_to_ride
                     potential_profit = ride_time
 
                     if cur_time_range[0] + time_to_ride <= ns:
@@ -140,6 +200,7 @@ def main():
                     ride_finish_ranges[i] = max_cur_time_range
 
             return max_profit_by_ride, next_ride_by_ride, ride_finish_ranges
+
 
         def get_ride_chain(max_profit_ride, next_ride_by_ride):
             i = max_profit_ride
@@ -193,9 +254,6 @@ def main():
 
             return True
 
-
-
-
         def get_schedule():
             taken_rides = set()
 
@@ -244,11 +302,9 @@ def main():
 
                 taken_rides.update(schedule[c])
 
-
         def solution():
             get_schedule()
 
-        check_rides()
         solution()
 
         of = open(fn + '.out', mode='w')
@@ -257,6 +313,8 @@ def main():
             of.write("{} {}\n".format(len(s),' '.join([str(x) for x in s])))
 
         of.close()
+
+        print('{} Done processing {}'.format(datetime.now(), fn))
 
 
 
